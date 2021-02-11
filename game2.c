@@ -104,8 +104,21 @@ void main() {
   char pad;	// controller flags
   
   // print instructions
-  vram_adr(NTADR_A(2,2));
+  
+   vram_adr(NTADR_A(6,2));
+  vram_write("DODGE THE OBJECTS!!!!", 21);
+  vram_adr(NTADR_A(6,26));
   vram_write("\x1c\x1d\x1e\x1f or ""wasd"" to move!", 21);
+  
+  vram_adr(NTADR_A(20,24));
+  vram_write("SCORE: ", 6);
+  
+  // figure out how to make this number change
+  vram_adr(NTADR_A(26,24));
+  vram_write("0", 1);
+  
+  
+  
   // setup graphics
   setup_graphics();
   // initialize actors with random values
