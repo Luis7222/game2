@@ -19,6 +19,7 @@ several different metasprites, which are defined using macros.
 ///// METASPRITES
 
 // define a 2x2 metasprite
+// define a 2x2 metasprite
 #define DEF_METASPRITE_2x2(name,code,pal)\
 const unsigned char name[]={\
         0,      0,      (code)+0,   pal, \
@@ -29,6 +30,16 @@ const unsigned char name[]={\
 
 // define a 2x2 metasprite, flipped horizontally
 #define DEF_METASPRITE_2x2_FLIP(name,code,pal)\
+const unsigned char name[]={\
+        8,      0,      (code)+0,   (pal)|OAM_FLIP_H, \
+        8,      8,      (code)+1,   (pal)|OAM_FLIP_H, \
+        0,      0,      (code)+2,   (pal)|OAM_FLIP_H, \
+        0,      8,      (code)+3,   (pal)|OAM_FLIP_H, \
+        128};
+
+
+// define a 2x2 metasprite, flipped horizontally
+#define DEF_METASPRITE_B_2x2_FLIP(name,code,pal)\
 const unsigned char name[]={\
         8,      0,      (code)+0,   (pal)|OAM_FLIP_H, \
         8,      8,      (code)+1,   (pal)|OAM_FLIP_H, \
@@ -80,7 +91,7 @@ const char PALETTE[32] = {
 // setup PPU and tables
 void setup_graphics() {
   // clear sprites
-  oam_hide_rest(0);
+  //oam_hide_rest(0);
   // set palette colors
   pal_all(PALETTE);
   // turn on PPU
@@ -89,7 +100,7 @@ void setup_graphics() {
 
 // number of actors (4 h/w sprites each)
 #define NUM_ACTORS 2
-		
+#define NUM_objs 5		
 // actor x/y positions
 byte actor_x[NUM_ACTORS];
 byte actor_y[NUM_ACTORS];
@@ -97,25 +108,79 @@ byte actor_y[NUM_ACTORS];
 sbyte actor_dx[NUM_ACTORS];
 sbyte actor_dy[NUM_ACTORS];
 
+
+
+typedef struct obj{
+  bool falling;
+  byte _x;		// object x/y position
+  byte _y;		
+  sbyte _dx;		// object x/y deltas per frame (signed)
+  sbyte _dy;
+  int sprite;
+  int points;
+  
+};
+
+
+byte rndint(byte, byte);
+byte iabs(int x);
+void obj_collision(int,);
+
+byte rndint(byte a, byte b){
+  return (rand() % (b-a)) + a;
+}
+
+struct obj objs[5];
+int score;
+
+
 // main program
 void main() {
-  char i;	// actor index
+  
+ 
+  char i; // actor index
   char oam_id;	// sprite ID
   char pad;	// controller flags
-  
+  score = 0; 
+   // Initialize actor objects
+  for(i=0;i<5;i++){		
+    objs[i].falling = false;		//Controls when object falls
+    objs[i]._x = rndint(20,230);	//X position
+    objs[i]._y = rndint(15,70);		//Y position
+    objs[i]._dy = 0;			//Falling Speed
+    objs[i].sprite = i+19;		//Sprite used
+    objs[i].points = i+1;		//Points added when collected
+  }
   // print instructions
   
-   vram_adr(NTADR_A(6,2));
+  vram_adr(NTADR_A(6,2));
   vram_write("DODGE THE OBJECTS!!!!", 21);
   vram_adr(NTADR_A(6,26));
-  vram_write("\x1c\x1d\x1e\x1f or ""wasd"" to move!", 21);
   
+  vram_adr(NTADR_A(6,3));
+  vram_write("    2 player mode", 18);
+  vram_adr(NTADR_A(6,26));
+  
+  
+  
+  vram_write("\x1c\x1d\x1e\x1f or ""wasd"" to move!", 21);
   vram_adr(NTADR_A(20,24));
+  
+  
+  
+
+      
+  
   vram_write("SCORE: ", 6);
   
-  // figure out how to make this number change
-  vram_adr(NTADR_A(26,24));
-  vram_write("0", 1);
+ 
+  // figure out how to make this number change 
+   //Draws and updates Scoreboard
+  
+  
+   
+  
+  //vram_write( "0" , 1);
   
   
   
@@ -130,6 +195,7 @@ void main() {
   }
   // loop forever
   while (1) {
+    
     // start with OAMid/sprite 0
     oam_id = 0;
     // set player 0/1 velocity based on controller
@@ -154,6 +220,29 @@ void main() {
       actor_x[i] += actor_dx[i];
       actor_y[i] += actor_dy[i];
     }
+    
+    
+  //Draws and updates Scoreboard
+    oam_id = oam_spr(232, 10, (score/10%10)+48, 2, oam_id);
+    oam_id = oam_spr(240, 10, (score%10)+48, 2, oam_id);
+    
+    for(i = 0; i<4; i++)
+     if(objs[i].sprite==20)
+     oam_id = oam_spr(objs[i]._x, objs[i]._y, objs[i].sprite, 2, oam_id);
+    else
+      oam_id = oam_spr(objs[i]._x, objs[i]._y, objs[i].sprite, 1, oam_id);
+      
+
+    for(i=0;i<4;i++){
+      if(rndint(1,200)==1)		//Fruit Hangs on tree for random set of rime
+        objs[i].falling = true;
+      
+      if(objs[i].falling)		//Set Fruit Fall speed 
+      	objs[i]._dy = rndint(1,3);
+        
+      objs[i]._y += objs[i]._dy;	//Make Fruit Fall
+      obj_collision(i);		// Check Collsion with Player
+    }	
     // hide rest of sprites
     // if we haven't wrapped oam_id around to 0
     if (oam_id!=0) oam_hide_rest(oam_id);
@@ -161,3 +250,47 @@ void main() {
     ppu_wait_frame();
   }
 }
+
+
+void obj_collision(int o){
+  if(objs[o]._y >= 210 || ((objs[o]._x >= actor_x[0]-4 && objs[o]._x <= actor_x[0]+8)&& (objs[o]._y >= actor_y[0]-2 && objs[o]._y <= actor_y[0]+4))) //hits floor or collision detected
+      {
+        if(objs[o]._y < 195){
+          
+          score += objs[o].points;
+          objs[o]._y = 210;
+        }
+        objs[o].sprite=0; // erase obj for a bit
+      }
+  
+  if(objs[o].sprite == 0 && objs[o]._y <= 160 && objs[o]._y >= 130 ){// Make obj reappear on random spot
+       	objs[o]._x = rndint(20,230);
+    	objs[o]._y = rndint(10,50);
+        objs[o]._dy = 0;
+    
+    //set sprite before reappearing
+    switch(o){
+      case 0:
+        objs[o].sprite=19;
+        objs[o].falling=false;
+        break;
+      case 1:
+        objs[o].sprite=20;
+        objs[o].falling=false;
+        break;
+      case 2:
+        objs[o].sprite=21;
+        objs[o].falling=false;
+        break;
+      case 3:
+        objs[o].sprite= 22;
+        objs[o].falling=false;
+        break;
+      default:
+        break;
+ 	}
+  }
+  
+
+}
+
