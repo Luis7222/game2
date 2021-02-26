@@ -9,9 +9,18 @@ several different metasprites, which are defined using macros.
 
 // include NESLIB header
 #include "neslib.h"
+//#link "obj_background.s"
+
 
 // include CC65 NES Header (PPU)
 #include <nes.h>
+
+
+extern char effects[];
+extern const byte obj_background_pal[16];
+extern const byte obj_background_rle[];
+
+
 
 // link the pattern table into CHR ROM
 //#link "chr_generic.s"
@@ -65,6 +74,9 @@ DEF_METASPRITE_2x2_FLIP(playerLSad, 0xf0, 0);
 
 DEF_METASPRITE_2x2(personToSave, 0xba, 1);
 
+
+
+
 const unsigned char* const playerRunSeq[16] = {
   playerLRun1, playerLRun2, playerLRun3, 
   playerLRun1, playerLRun2, playerLRun3, 
@@ -75,17 +87,17 @@ const unsigned char* const playerRunSeq[16] = {
 };
 
 /*{pal:"nes",layout:"nes"}*/
-const char PALETTE[32] = { 
-  0x00,			// screen color
+const char PALETTE[22] = { 
+  0x11,			// screen color
 
  
 
-  0x06,0x16,0x26,0x0,	// background palette 3
+  0x06,0x0,0x25,0x0,	// background palette 3
 
-  0x16,0x35,0x24,0x0,	// sprite palette 0
-  0x00,0x37,0x25,0x0,	// sprite palette 1
+  0x16,0x35,0x25,0x0,	// sprite palette 0
+  0x00,0x37,0x24,0x0,	// sprite palette 1
   0x0d,0x2d,0x3a,0x0,	// sprite palette 2
-  0x0d,0x27,0x2a	// sprite palette 3
+  0x0d,0x27,0x3a	// sprite palette 3
 };
 
 // setup PPU and tables
@@ -100,7 +112,7 @@ void setup_graphics() {
 
 // number of actors (4 h/w sprites each)
 #define NUM_ACTORS 2
-#define NUM_objs 5		
+#define NUM_objs 15		
 // actor x/y positions
 byte actor_x[NUM_ACTORS];
 byte actor_y[NUM_ACTORS];
@@ -130,7 +142,7 @@ byte rndint(byte a, byte b){
   return (rand() % (b-a)) + a;
 }
 
-struct obj objs[5];
+struct obj objs[10];
 int score;
 
 
@@ -141,16 +153,23 @@ void main() {
   char i; // actor index
   char oam_id;	// sprite ID
   char pad;	// controller flags
-  score = 0; 
+  score = 0;
+  
    // Initialize actor objects
-  for(i=0;i<5;i++){		
+  for(i=0;i<10;i++){		
     objs[i].falling = false;		//Controls when object falls
     objs[i]._x = rndint(20,230);	//X position
     objs[i]._y = rndint(15,70);		//Y position
-    objs[i]._dy = 0;			//Falling Speed
-    objs[i].sprite = i+19;		//Sprite used
+    objs[i]._dy = 1;			//Falling Speed
+    objs[i].sprite = i+22;		//Sprite used
     objs[i].points = i+1;		//Points added when collected
   }
+  
+    actor_x[0] = 120;
+    actor_y[0] = 191;
+    actor_dx[0] = 0;
+    actor_dy[0] = 0;
+  
   // print instructions
   
   vram_adr(NTADR_A(6,2));
@@ -176,7 +195,7 @@ void main() {
  
   // figure out how to make this number change 
    //Draws and updates Scoreboard
-  
+ 
   
    
   
@@ -193,7 +212,7 @@ void main() {
     actor_dx[i] = 0;
     actor_dy[i] = 0;
   }
-  // loop forever
+  // loop forever (GAME LOOP)
   while (1) {
     
     // start with OAMid/sprite 0
@@ -223,24 +242,24 @@ void main() {
     
     
   //Draws and updates Scoreboard
-    oam_id = oam_spr(232, 10, (score/10%10)+48, 2, oam_id);
-    oam_id = oam_spr(240, 10, (score%10)+48, 2, oam_id);
-    
-    for(i = 0; i<4; i++)
+    oam_id = oam_spr(206, 191, (score/10%10)+48, 1, oam_id);
+    oam_id = oam_spr(213, 191, (score%10)+48, 1, oam_id);
+  
+    for(i = 0; i<10; i++)
      if(objs[i].sprite==20)
-     oam_id = oam_spr(objs[i]._x, objs[i]._y, objs[i].sprite, 2, oam_id);
+     oam_id = oam_spr(objs[i]._x, objs[i]._y, objs[i].sprite, 1, oam_id);
     else
       oam_id = oam_spr(objs[i]._x, objs[i]._y, objs[i].sprite, 1, oam_id);
       
 
-    for(i=0;i<4;i++){
-      if(rndint(1,200)==1)		//Fruit Hangs on tree for random set of rime
+    for(i=0;i<10;i++){
+      if(rndint(1,2)==1)		//obj stays for random set of time
         objs[i].falling = true;
       
-      if(objs[i].falling)		//Set Fruit Fall speed 
-      	objs[i]._dy = rndint(1,3);
+      if(objs[i].falling)		//Set object Fall speed 
+      	objs[i]._dy = rndint(1,2);
         
-      objs[i]._y += objs[i]._dy;	//Make Fruit Fall
+      objs[i]._y += objs[i]._dy;	//Make obj Fall
       obj_collision(i);		// Check Collsion with Player
     }	
     // hide rest of sprites
@@ -248,6 +267,9 @@ void main() {
     if (oam_id!=0) oam_hide_rest(oam_id);
     // wait for next frame
     ppu_wait_frame();
+    
+    
+    
   }
 }
 
@@ -284,6 +306,14 @@ void obj_collision(int o){
         break;
       case 3:
         objs[o].sprite= 22;
+        objs[o].falling=false;
+        break;
+         case 4:
+        objs[o].sprite=23;
+        objs[o].falling=false;
+        break;
+      case 5:
+        objs[o].sprite= 24;
         objs[o].falling=false;
         break;
       default:
